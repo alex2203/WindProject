@@ -60,6 +60,7 @@ GPIO.setup(24, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 def count_function(channel): 
 	global half_revolutions 
 	half_revolutions = half_revolutions + 1 
+	ToggleGreenLED()
 # when a falling edge is detected on port 24, regardless of whatever   
 GPIO.add_event_detect(24, GPIO.FALLING, callback=count_function, bouncetime=100)
 
@@ -147,6 +148,9 @@ def LEDtoggleYellow(seconds):
 		time.sleep(0.1)
 		SmoothOff('YELLOW',20000)
 
+def ToggleGreenLED():
+	LEDoff(False)
+	servo.set_servo(GREEN,20000)
        
 
 # Schedule function, to do something every second.
