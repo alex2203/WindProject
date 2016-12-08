@@ -184,14 +184,14 @@ def refresh(sc):
 	half_revolutions = 0
 	GPIO.add_event_detect(24, GPIO.FALLING, callback=count_function, bouncetime=100)
      # calculate rpm with half_revolution
-	rpm = temp_revo * 30
+	rpm = temp_revo * 30 * 0.10
 	revolutions = temp_revo/2
   
 	#mps = 2*radius*math.pi*(rpm/60)    
 	#kmh = mps *3.6
 
     # test
-	kmh = 2.4*temp_revo
+	kmh = 2.4*temp_revo*0.10
 	mps = kmh/3.6
 	temp_revo = 0
 
@@ -213,7 +213,7 @@ def refresh(sc):
 		TenSecCounter = 1
 	if MinuteCounter > 60:
 		MinuteCounter = 1
-	screen.addstr(11,1,str(MinuteCounter))
+	#screen.addstr(11,1,str(MinuteCounter))
 
     # print to screen
 	screen.addstr(12,1,'Press button or s to stop the measurement...')
@@ -262,7 +262,7 @@ def refresh(sc):
 
     # still in OnState Check
 	if OnState is True:
-		s.enter(1,1, refresh, (s,))
+		s.enter(10,1, refresh, (s,))
 	else:
 		countHalfRev = 0
 		pass
