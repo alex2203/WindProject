@@ -22,20 +22,24 @@ OnState = False
 # Anemometer:
 radius = 0.070 # radius in m
 kmh = 0 # kmh
+kmhMIN = 0 # kmh Average Mintue 
 half_revolutions = 0 #  counter for the anemometer with reset each second
 countHalfRev = 0 #  counter for the anemometer without reset
 mps = 0 # rpm
+mpsMIN = 0 # mps Average Minute
+temp_revoMIN = 0 #revolution counter Average Minute
+WriteAvgMinute = False # Write Average Minute Entry in ResultDataFile
 count = 1 #counting for file.
 blinkRun = True
 DotCounter = 1
 
 #Diffrenent measurement Intervalls
 #for slow measurements:
-TwoSecCounter = 0
-FourSecCounter = 0
-SixSecCounter = 0
-TenSecCounter = 0
-MinuteCounter = 0
+#TwoSecCounter = 0
+#FourSecCounter = 0
+#SixSecCounter = 0
+#TenSecCounter = 0
+#MinuteCounter = 0
 
 
 # Command line commands:
@@ -60,7 +64,7 @@ GPIO.setup(24, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 def count_function(channel): 
 	global half_revolutions 
 	half_revolutions = half_revolutions + 1 
-	ToggleGreenLED()
+	#ToggleGreenLED()
 # when a falling edge is detected on port 24, regardless of whatever   
 GPIO.add_event_detect(24, GPIO.FALLING, callback=count_function, bouncetime=100)
 
@@ -166,11 +170,16 @@ def refresh(sc):
 	global blinkRun
 	global DotCounter
 	
-	global TwoSecCounter
-	global FourSecCounter
-	global SixSecCounter
-	global TenSecCounter 
+#	global TwoSecCounter
+#	global FourSecCounter
+#	global SixSecCounter
+#	global TenSecCounter 
 	global MinuteCounter
+	global temp_revoMIN
+	global kmhMIN
+	global mpsMIN
+	global WriteAvgMinute
+	global WriteFile
 
     # refresh every second the command line
 	screen = curses.initscr()
@@ -185,35 +194,40 @@ def refresh(sc):
 	GPIO.add_event_detect(24, GPIO.FALLING, callback=count_function, bouncetime=100)
      # calculate rpm with half_revolution
 	rpm = temp_revo * 30 * 0.10
-	revolutions = temp_revo/2
+	#revolutions = temp_revo/2
   
 	#mps = 2*radius*math.pi*(rpm/60)    
 	#kmh = mps *3.6
 
     # test
 	kmh = 2.4*temp_revo*0.10
-	mps = kmh/3.6
+	mps = kmh*0.277778
+	temp_revoMIN = temp_revo + temp_revoMIN
 	temp_revo = 0
 
     #increase counters: 
-	TwoSecCounter += 1
-	FourSecCounter +=1
-	SixSecCounter +=1
-	TenSecCounter +=1
+#	TwoSecCounter += 1
+#	FourSecCounter +=1
+#	SixSecCounter +=1
+#	TenSecCounter +=1
 	MinuteCounter +=1
 
-    #Counter Reset, worksqss
-	if TwoSecCounter > 2:
-		TwoSecCounter = 1
-	if FourSecCounter > 4:
-		FourSecCounter = 1
-	if SixSecCounter > 6:
-		SixSecCounter = 1
-	if TenSecCounter > 10:
-		TenSecCounter = 1
-	if MinuteCounter > 60:
+#    #Counter Reset, worksqss
+#	if TwoSecCounter > 2:
+#		TwoSecCounter = 1
+#	if FourSecCounter > 4:
+#		FourSecCounter = 1
+#	if SixSecCounter > 6:
+#		SixSecCounter = 1
+#	if TenSecCounter > 10:
+#		TenSecCounter = 1
+	if MinuteCounter > 6:
+                kmhMIN = 2.4*temp_revoMIN*0.0166667
+                mpsMIN = kmhMIN*0.277778
+                temp_revoMIN = 0
 		MinuteCounter = 1
-	#screen.addstr(11,1,str(MinuteCounter))
+		WriteAvgMinute = True
+#	screen.addstr(11,1,str(MinuteCounter))
 
     # print to screen
 	screen.addstr(12,1,'Press button or s to stop the measurement...')
@@ -234,14 +248,27 @@ def refresh(sc):
 	screen.addstr(16,1, '\''+WriteFile+'\'')
 	screen.addstr(17,1,datetime.datetime.now().strftime(dateString))
 	screen.addstr(19,1,'Count  of half revolutions = '+str(countHalfRev))
-	screen.addstr(20,1,'Frequency (Hz) = '+str(revolutions))
-	screen.addstr(21,1,'Anemometer rpm = '+str(rpm))
-	screen.addstr(22,1,'Wind speed in m/s = '+str(round(mps,2))+'; in km/h = '+str(round(kmh,2)))
+	#screen.addstr(20,1,'Frequency (Hz) = '+str(revolutions))
+	screen.addstr(20,1,'Anemometer rpm = '+str(rpm))
+	screen.addstr(21,1,'Wind speed in m/s = '+str(round(mps,2))+'; in km/h = '+str(round(kmh,2)))
+        screen.addstr(22,1,'Wind speed (Avg Min) in m/s = '+str(round(mpsMIN,2))+'; in km/h = '+str(round(kmhMIN,2)))
 	screen.refresh()
     
     #print to file
-	ToWrite = ',' + str(count) +','+ datetime.datetime.now().strftime(dateString) + ',' + str(mps) + ',' + str(kmh) + ',\n'
-	f.write(ToWrite)
+	if WriteAvgMinute is False:
+                ToWrite = ',' + str(count) +','+ datetime.datetime.now().strftime(dateString) + ',' + str(round(mps,2)) + ',' + str(kmh) + ',,,' + str(countHalfRev) + ',\n'
+        else:
+                ToWrite = ',' + str(count) +','+ datetime.datetime.now().strftime(dateString) + ',' + str(round(mps,2)) + ',' + str(kmh) + ',' + str(round(mpsMIN,2)) + ',' + str(kmhMIN) + ',' + str(countHalfRev) + ',\n'
+                WriteAvgMinute = False
+        #write to file
+        try:
+                f = open(WriteFile, "a")        
+                f.write(ToWrite)
+                f.close()
+        except IOError:
+                pass
+        
+	
 	count = count + 1
     
     #Any keyboard inputs?	
@@ -259,6 +286,7 @@ def refresh(sc):
 		blinkRun = False
 	else:
 		blinkRun = True
+
 
     # still in OnState Check
 	if OnState is True:
@@ -322,6 +350,7 @@ def main(stdscr):
 	global SixSecCounter
 	global TenSecCounter 
 	global MinuteCounter
+	global WriteFile
 
     	LEDoff(False) #turn all LEDs off
 	OnState = False
@@ -364,12 +393,13 @@ def main(stdscr):
 				WriteFile = filedir+filename                 
 				try:
 					f = open(WriteFile, "w")
-					f.write('Anemometer Result Data File - results.csv,\n,Nr., Date, Time, Windspeed in m/s,Windspeed in km/h,\n')
+					f.write('Anemometer Result Data File - results.csv,\n,Nr., Date, Time, Windspeed in m/s,Windspeed in km/h,Windspeed in m/s (Minute Average),Windspeed in km/h (Minute Average),Half Revolution counter,\n')
+                                        f.write('New Meas')
+                                        f.close()
 				except IOError:
 					CleanUp()
 					sys.exit('Could not create file! Program stopped!')                           
 				# refresh command line every second
-				f.write('New Meas')
 				blinkRun = True
 				s.enter(1,1, refresh, (s,))
 				s.run()
@@ -379,7 +409,6 @@ def main(stdscr):
 				printOffScreen(stdscr)
 				stdscr.refresh()
 				#close current file
-				f.close()
 				SmoothOff(GREEN,20000) # Smooth off Green.
 				#time.sleep(0.1)
 				LEDred()
