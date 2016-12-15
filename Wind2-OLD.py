@@ -11,11 +11,9 @@ import sys,tty,termios, curses
 import math
 import os
 
-
 from curses import wrapper
 from RPIO import PWM
 
-from apscheduler.schedulers.background import BackgroundScheduler
 
 
 # OnState
@@ -54,9 +52,6 @@ fileDateString = '%Y-%m-%d_%H-%M-%S_results.csv'
 
 #data
 WriteFile = '0'
-
-#define Scheduler:
-sched = BackgroundScheduler()
 
 
 # Setup Interrupt GPIO24 for Anemometer
@@ -163,9 +158,9 @@ def ToggleGreenLED():
        
 
 # Schedule function, to do something every second.
-#s = sched.scheduler(time.time, time.sleep)
+s = sched.scheduler(time.time, time.sleep)
 #def refresh(sc):
-def MeasurementRun():
+def refresh(sc):
 	global half_revolutions
 	global countHalfRev
 	global f
@@ -295,11 +290,9 @@ def MeasurementRun():
 
     # still in OnState Check
 	if OnState is True:
-		#s.enter(10,1, refresh, (s,))
-                pass
+		s.enter(10,1, refresh, (s,))
 	else:
 		countHalfRev = 0
-	
 		pass
     
 # Setup Keyboard toggle
@@ -408,17 +401,8 @@ def main(stdscr):
 					sys.exit('Could not create file! Program stopped!')                           
 				# refresh command line every second
 				blinkRun = True
-				
-				#start scheduler:
-				sched.add_job(MeasurementRun,'interval', seconds = 10, id='meas')
-                                sched.start()
-                                while OnState is True:
-                                        time.sleep(1)
-                                sched.remove_job('meas')
-                                sched.shutdown()
-				#s.enter(1,1, refresh, (s,))
-				#s.run()
-				
+				s.enter(1,1, refresh, (s,))
+				s.run()
 				#set screen back to off state.
 				stdscr.clear()  
 				printInitScreen(stdscr)
