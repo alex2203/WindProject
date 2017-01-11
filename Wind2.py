@@ -413,7 +413,7 @@ def main(stdscr):
 				sched.add_job(MeasurementRun,'interval', seconds = 10, id='meas')
                                 sched.start()
                                 while OnState is True:
-                                        time.sleep(11)
+                                        time.sleep(20)
                                 sched.remove_job('meas')
                                 sched.shutdown()
 				#s.enter(1,1, refresh, (s,))
