@@ -235,7 +235,9 @@ def MeasurementRun():
 #	screen.addstr(11,1,str(MinuteCounter))
 
     # print to screen
-	screen.addstr(12,1,'Press button or s to stop the measurement...')
+	screen.addstr(10,1,'Press button or s to stop the measurement...')
+	screen.addstr(11,1,'After you pressed s for stop, the program needs up to')
+	screen.addstr(12,1,'20s to shutdown. Do not press any button in that time!')
 	if blinkRun is True:
 		MeasStr = 'Measurement running'
 		DotStr = '.'
@@ -342,6 +344,17 @@ def printOffScreen(stdscr):
 	stdscr.addstr(13,1,'Waiting for measqurement')
 	stdscr.addstr(15,1,'Press Button or s to start new measurement')
 
+def printStartScreen(stdscr):
+	stdscr.addstr(11,1,'Program started')
+	stdscr.addstr(13,1,'Please, wait until initialization has been completed')
+	stdscr.addstr(15,1,'Do not press any button')
+
+def 	printStartScreenProg():
+	screenStart = curses.initscr()
+	screenStart.clear()  
+	printInitScreen(screenStart)			
+	printStartScreen(screenStart)
+	screenStart.refresh()
 
 # main program######################################################################
 #start print
@@ -391,7 +404,8 @@ def main(stdscr):
 				FourSecCounter = 0
 				SixSecCounter = 0
 				TenSecCounter = 0
-				MinuteCounter = 0  
+				MinuteCounter = 0 
+				printStartScreenProg()
 				LEDtoggleYellow(3)
 				LEDgreen()
 				#open or creat file:
