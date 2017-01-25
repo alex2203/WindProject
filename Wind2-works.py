@@ -14,8 +14,6 @@ import os
 
 from curses import wrapper
 from RPIO import PWM
-import logging
-logging.basicConfig()
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -29,18 +27,26 @@ kmh = 0 # kmh
 kmhMIN = 0 # kmh Average Mintue 
 half_revolutions = 0 #  counter for the anemometer with reset each second
 countHalfRev = 0 #  counter for the anemometer without reset
-rpm = 0 #rpm
-mps = 0 # mps
+mps = 0 # rpm
 mpsMIN = 0 # mps Average Minute
 temp_revoMIN = 0 #revolution counter Average Minute
 WriteAvgMinute = False # Write Average Minute Entry in ResultDataFile
 count = 1 #counting for file.
 blinkRun = True
 DotCounter = 1
-MinuteCounter = 0
-runningCounter = 0
-turnCounter = 0
-StarString = ''
+
+#Diffrenent measurement Intervalls
+#for slow measurements:
+#TwoSecCounter = 0
+#FourSecCounter = 0
+#SixSecCounter = 0
+#TenSecCounter = 0
+#MinuteCounter = 0
+
+
+# Command line commands:
+CURSOR_UP_ONE = '\x1b[1A'
+ERASE_LINE = '\x1b[2K'
 
 # time
 dateString = '%d.%m.%Y, %H:%M:%S'
@@ -58,7 +64,6 @@ import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
 # GPIO 24 set up as an input, pulled down, connected to 3V3 on button press  
 GPIO.setup(24, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
 # Interrupt from anemometer
 # count function, if there is a half revolution of anemometer.  
 def count_function(channel): 
@@ -136,11 +141,13 @@ def LEDoff(Smooth): # if Smooth on, red LED turns off slowly. Set Smooth only tr
 def LEDred():
 	LEDoff(False)
 	SmoothOn(RED,20000)
+	#servo.set_servo(RED,16000)
+	#servo.set_servo(GREEN,7000)
+
     
 def LEDgreen():
 	LEDoff(False)
 	SmoothOn(GREEN,20000)
-
 
 def LEDtoggleYellow(seconds):
 	LEDoff(True)
@@ -163,22 +170,27 @@ def MeasurementRun():
 	global countHalfRev
 	global f
 	global count
-	#global OnState
+	global OnState
 	global WriteFile
 	global blinkRun
-	global DotCounter	
-
+	global DotCounter
+	
+#	global TwoSecCounter
+#	global FourSecCounter
+#	global SixSecCounter
+#	global TenSecCounter 
 	global MinuteCounter
 	global temp_revoMIN
 	global kmhMIN
 	global mpsMIN
 	global WriteAvgMinute
 	global WriteFile
-	global rpm
-	global kmh
-	global mps
 
-      
+    # refresh every second the command line
+	screen = curses.initscr()
+	screen.clear()  
+	printInitScreen(screen)
+    
     # stop interrupt while calculating
 	GPIO.remove_event_detect(24)
 	temp_revo = half_revolutions
@@ -187,7 +199,8 @@ def MeasurementRun():
 	GPIO.add_event_detect(24, GPIO.FALLING, callback=count_function, bouncetime=100)
      # calculate rpm with half_revolution
 	rpm = temp_revo * 30 * 0.10
-	#revolutions = temp_revo/2  
+	#revolutions = temp_revo/2
+  
 	#mps = 2*radius*math.pi*(rpm/60)    
 	#kmh = mps *3.6
 
@@ -198,22 +211,63 @@ def MeasurementRun():
 	temp_revo = 0
 
     #increase counters: 
+#	TwoSecCounter += 1
+#	FourSecCounter +=1
+#	SixSecCounter +=1
+#	TenSecCounter +=1
 	MinuteCounter +=1
 
+#    #Counter Reset, worksqss
+#	if TwoSecCounter > 2:
+#		TwoSecCounter = 1
+#	if FourSecCounter > 4:
+#		FourSecCounter = 1
+#	if SixSecCounter > 6:
+#		SixSecCounter = 1
+#	if TenSecCounter > 10:
+#		TenSecCounter = 1
 	if MinuteCounter > 6:
                 kmhMIN = 2.4*temp_revoMIN*0.0166667
                 mpsMIN = kmhMIN*0.277778
                 temp_revoMIN = 0
 		MinuteCounter = 1
 		WriteAvgMinute = True
-	
-	# Write to file
+#	screen.addstr(11,1,str(MinuteCounter))
+
+    # print to screen
+	screen.addstr(10,1,'Press button or s to stop the measurement...')
+	screen.addstr(11,1,'After you pressed s for stop, the program needs up to')
+	screen.addstr(12,1,'20s to shutdown. Do not press any button in that time!')
+	if blinkRun is True:
+		MeasStr = 'Measurement running'
+		DotStr = '.'
+		if DotCounter < 30:
+			DotCounter+=DotCounter
+		elif DotCounter >30:
+			DotCounter = 1
+		for n in range(0, DotCounter):
+			DotStr = DotStr + '.'
+			screen.addstr(14,1, MeasStr+DotStr)
+	else:
+		screen.addstr(14,1,'' )
+
+	screen.addstr(15,1,'Result data can be found in')
+	screen.addstr(16,1, '\''+WriteFile+'\'')
+	screen.addstr(17,1,datetime.datetime.now().strftime(dateString))
+	screen.addstr(19,1,'Count  of half revolutions = '+str(countHalfRev))
+	#screen.addstr(20,1,'Frequency (Hz) = '+str(revolutions))
+	screen.addstr(20,1,'Anemometer rpm = '+str(rpm))
+	screen.addstr(21,1,'Wind speed in m/s = '+str(round(mps,2))+'; in km/h = '+str(round(kmh,2)))
+        screen.addstr(22,1,'Wind speed (Avg Min) in m/s = '+str(round(mpsMIN,2))+'; in km/h = '+str(round(kmhMIN,2)))
+	screen.refresh()
+    
+    #print to file
 	if WriteAvgMinute is False:
                 ToWrite = ',' + str(count) +','+ datetime.datetime.now().strftime(dateString) + ',' + str(round(mps,2)) + ',' + str(kmh) + ',,,' + str(countHalfRev) + ',\n'
         else:
                 ToWrite = ',' + str(count) +','+ datetime.datetime.now().strftime(dateString) + ',' + str(round(mps,2)) + ',' + str(kmh) + ',' + str(round(mpsMIN,2)) + ',' + str(kmhMIN) + ',' + str(countHalfRev) + ',\n'
                 WriteAvgMinute = False
-        #
+        #write to file
         try:
                 f = open(WriteFile, "a")        
                 f.write(ToWrite)
@@ -223,82 +277,7 @@ def MeasurementRun():
         
 	
 	count = count + 1
-
     
-def PrintMeasurementRun():
-	global half_revolutions
-	global countHalfRev
-	global f
-	global count
-	global OnState
-	global WriteFile
-	global blinkRun
-	global DotCounter
-
-	global MinuteCounter
-	global temp_revoMIN
-	global kmhMIN
-	global mpsMIN
-	global kmh
-	global mps
-	global WriteAvgMinute
-	global WriteFile
-	global rpm
-	global runningCounter
-	global turnCounter
-	global StarString
-
-	screen = curses.initscr()
-	screen.clear()  
-	printInitScreen(screen)
-
-    # print to screen
-	#if OnState is True:
-	screen.addstr(11,1,'Measurement running')
-	screen.addstr(13,1, 'Press button or s to stop the measurement...')	
-	
-
-
-	turnCounter = turnCounter+1
-	if turnCounter > 5:
-		turnCounter = 0
-		MeasString = '/'
-	elif turnCounter == 0:
-		MeasString = '/'
-	elif turnCounter == 1:
-		MeasString = '\ '
-	elif turnCounter == 2:
-		MeasString = '-'
-	elif turnCounter == 3:
-		MeasString = '/ '
-	elif turnCounter == 4:
-		MeasString = '\ '
-	elif turnCounter == 5:
-		MeasString = '-'
-	else:
-		pass
-	
-	screen.addstr(11,20,StarString+MeasString)
-
-	if runningCounter > 34:
-		runningCounter = 0
-		StarString = ''
-	else:
-		runningCounter = runningCounter+1
-		StarString = StarString + '*'
-
-	screen.addstr(15,1,'Result data can be found in')
-	screen.addstr(16,1, '\''+WriteFile+'\'')
-	screen.addstr(17,1,datetime.datetime.now().strftime(dateString))	
-	screen.addstr(19,1,'Count  of half revolutions = '+str(countHalfRev))
-	#screen.addstr(20,1,'Frequency (Hz) = '+str(revolutions))
-	screen.addstr(20,1,'Anemometer rpm = '+str(rpm))
-	screen.addstr(21,1,'Wind speed in m/s = '+str(round(mps,2))+'; in km/h = '+str(round(kmh,2)))
-       	screen.addstr(22,1,'Wind speed (Avg Min) in m/s = '+str(round(mpsMIN,2))+'; in km/h = '+str(round(kmhMIN,2)))
-	screen.refresh()
-
-
-
     #Any keyboard inputs?	
 	try:
 		inChr = '0' # 0 is default
@@ -314,7 +293,16 @@ def PrintMeasurementRun():
 		blinkRun = False
 	else:
 		blinkRun = True
+
+
+    # still in OnState Check
+	if OnState is True:
+		#s.enter(10,1, refresh, (s,))
+                pass
+	else:
+		countHalfRev = 0
 	
+		pass
     
 # Setup Keyboard toggle
 def keyboard_toggle():
@@ -324,19 +312,12 @@ def keyboard_toggle():
 	elif OnState is True:
 		OnState = False
 
-# Generate IsRunningString
-def IsRunningPrint(TempStr):
-	PrintedString = TempStr
-	return PrintedString
-
-
 # CleanUp function, should be executed before program is quitted
 # It cleans up all the LED, GPIOs and closes all files
 def CleanUp():
 	global f
 	LEDoff(True)        #Turn off all LED
 	GPIO.cleanup()  # clean up GPIO on normal exit  while True:
- 	sched.shutdown()  #Shutdown Scheduler
 	try:
 		f.close()       # close the file
 	except NameError:
@@ -383,11 +364,17 @@ def main(stdscr):
 	global WriteFile
 	global blinkRun
 	global count
-	global countHalfRev
+
+	global TwoSecCounter
+	global FourSecCounter
+	global SixSecCounter
+	global TenSecCounter 
+	global MinuteCounter
 	global WriteFile
 
     	LEDoff(False) #turn all LEDs off
 	OnState = False
+    #open clear screen
 	stdscr.clear()  
 	curses.noecho()
 	curses.curs_set(0)
@@ -395,7 +382,6 @@ def main(stdscr):
 	printOffScreen(stdscr)
 	stdscr.refresh()
 	stdscr.nodelay(True) #doesn't wait for keyboard inputs    3
-	sched.start() # Start Scheduler
 	LEDred()
 	try:        	
 		while True:
@@ -414,6 +400,10 @@ def main(stdscr):
 					pass     
 			elif OnState is True:  
 				count = 1
+				TwoSecCounter = 0
+				FourSecCounter = 0
+				SixSecCounter = 0
+				TenSecCounter = 0
 				MinuteCounter = 0 
 				printStartScreenProg()
 				LEDtoggleYellow(3)
@@ -434,36 +424,23 @@ def main(stdscr):
 				blinkRun = True
 				
 				#start scheduler:
-				sched.add_job(MeasurementRun,'interval', seconds = 10, id='meas')		
-				#sched.add_job(PrintMeasurementRun,'interval', seconds = 1, id='measScreen')				
-                                #infinite loop as long as OnState is True				
-				while OnState is True:
-					#pass
-                                        #time.sleep(100)
-					PrintMeasurementRun()
-					time.sleep(2)
+				sched.add_job(MeasurementRun,'interval', seconds = 10, id='meas')
+                                sched.start()
+                                while OnState is True:
+                                        time.sleep(20)
                                 sched.remove_job('meas')
-				#sched.remove_job('measScreen')
-                               
-				# Reset Measurement Variables
-				countHalfRev = 0
-				runningCounter = 0
-				turnCounter = 0
-				kmh = 0 
-				kmhMIN = 0  
-				half_revolutions = 0 
-				rpm = 0 
-				mps = 0
-				mpsMIN = 0 
-				temp_revoMIN = 0 
-				StarString = ''
+                                sched.shutdown()
+				#s.enter(1,1, refresh, (s,))
+				#s.run()
 				
 				#set screen back to off state.
 				stdscr.clear()  
 				printInitScreen(stdscr)
 				printOffScreen(stdscr)
 				stdscr.refresh()
-				SmoothOff(GREEN,20000) # Smooth off Green.			
+				#close current file
+				SmoothOff(GREEN,20000) # Smooth off Green.
+				#time.sleep(0.1)
 				LEDred()
                 
     # kill programm after pressing ctrl+c
